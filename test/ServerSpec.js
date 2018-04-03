@@ -190,10 +190,8 @@ describe('', function() {
         };
 
         requestWithSession(options, function(error, res, body) {
-          console.log(res.body.url);
-          console.log(link.get('url'));
           var code = res.body.code;
-          expect(code).to.equal(link.get('url'));
+          expect(code).to.equal(link.get('code'));
           done();
         });
       });

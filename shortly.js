@@ -2,6 +2,8 @@ var express = require('express');
 var util = require('./lib/utility');
 var partials = require('express-partials');
 var bodyParser = require('body-parser');
+var bcrypt = require('bcrypt');
+
 
 
 var db = require('./app/config');
@@ -10,8 +12,11 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
-
+var flash = require('connect-flash');
+var expressValidator = require('express-validator');
+var session = require('express-session');
 var app = express();
+var mongoose = require('mongoose');
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -21,61 +26,114 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
+// app.use(express.session({
+//   secret: 'fuck off!',
+//   resave: false,
+//   saveUninitialized: true
+// }));
+// app.use(express.cookieParser('Oops fuck off!'));
 
+// function restrict(req, res, next) {
+//   if (req.session.user) {
+//     next();
+//   } else {
+//     req.session.error = 'Access denied';k
+//     req.redirect('/login');
+//   }
+// }
 
 app.get('/', 
-function(req, res) {
-  res.render('index');
-});
+  function(req, res) {
+    res.render('index');
+  });
 
 app.get('/create', 
-function(req, res) {
-  res.render('index');
-});
+  function(req, res) {
+    res.render('index');
+  });
 
 app.get('/links', 
-function(req, res) {
-  Links.reset().fetch().then(function(links) {
-    res.status(200).send(links.models);
+  function(req, res) {
+    Links.reset().fetch().then(function(links) {
+      res.status(200).send(links.models);
+    });
   });
-});
 
 app.post('/links', 
-function(req, res) {
-  var uri = req.body.url;
+  function(req, res) {
+    var uri = req.body.url;
 
-  if (!util.isValidUrl(uri)) {
-    console.log('Not a valid url: ', uri);
-    return res.sendStatus(404);
-  }
-
-  new Link({ url: uri }).fetch().then(function(found) {
-    if (found) {
-      res.status(200).send(found.attributes);
-    } else {
-      util.getUrlTitle(uri, function(err, title) {
-        if (err) {
-          console.log('Error reading URL heading: ', err);
-          return res.sendStatus(404);
-        }
-
-        Links.create({
-          url: uri,
-          title: title,
-          baseUrl: req.headers.origin
-        })
-        .then(function(newLink) {
-          res.status(200).send(newLink);
-        });
-      });
+    if (!util.isValidUrl(uri)) {
+      console.log('Not a valid url: ', uri);
+      return res.sendStatus(404);
     }
+
+    new Link({ url: uri }).fetch().then(function(found) {
+      if (found) {
+        res.status(200).send(found.attributes);
+      } else {
+        util.getUrlTitle(uri, function(err, title) {
+          if (err) {
+            console.log('Error reading URL heading: ', err);
+            return res.sendStatus(404);
+          }
+
+          Links.create({
+            url: uri,
+            title: title,
+            baseUrl: req.headers.origin
+          })
+            .then(function(newLink) {
+              res.status(200).send(newLink);
+            });
+        });
+      }
+    });
   });
-});
 
 /************************************************************/
 // Write your authentication routes here
 /************************************************************/
 
+app.get('/login', function(req, res) {
+  res.render('login');
+});
+
+app.post('/login', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+
+  new User({ username: username }).fetch().then(function(usernamefound) {
+    if (!usernamefound) {
+      res.redirect('/signup');
+    } else {
+      User.verifyPassword(password, function() {
+        
+      });
+    }
+  });
+});
+
+app.get('/signup', function(req, res) {
+  res.render('signup');
+});
+
+app.post('/signup', function(req, res) {
+  var username = req.body.username;
+  var password = req.body.password;
+  
+  new User({ username: username, password: password }).save()
+    .then( (user) => {
+      res.redirect('/login');
+    });
+});
+
+
+app.get('/logout', function(req, res) {
+  req.session.destroy(function() {
+    res.redirect('/login');
+  });
+});
 
 
 /************************************************************/
