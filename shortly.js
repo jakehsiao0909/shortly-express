@@ -12,11 +12,10 @@ var User = require('./app/models/user');
 var Links = require('./app/collections/links');
 var Link = require('./app/models/link');
 var Click = require('./app/models/click');
-var flash = require('connect-flash');
-var expressValidator = require('express-validator');
 var session = require('express-session');
 var app = express();
-var mongoose = require('mongoose');
+var JSAlert = require("js-alert");
+
 
 app.set('views', __dirname + '/views');
 app.set('view engine', 'ejs');
@@ -26,21 +25,7 @@ app.use(bodyParser.json());
 // Parse forms (signup/login)
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(express.static(__dirname + '/public'));
-// app.use(express.session({
-//   secret: 'fuck off!',
-//   resave: false,
-//   saveUninitialized: true
-// }));
-// app.use(express.cookieParser('Oops fuck off!'));
-
-// function restrict(req, res, next) {
-//   if (req.session.user) {
-//     next();
-//   } else {
-//     req.session.error = 'Access denied';k
-//     req.redirect('/login');
-//   }
-// }
+app.use(session({secret: 'my super secret'}));
 
 app.get('/', 
   function(req, res) {
@@ -105,12 +90,18 @@ app.post('/login', function(req, res) {
 
   new User({ username: username }).fetch().then(function(usernamefound) {
     if (!usernamefound) {
+      JSAlert.alert('Account does not exist, please sign up!')
       res.redirect('/signup');
     } else {
-      User.verifyPassword(password, function() {
-        
-      });
-    }
+      usernamefound.verifyPassword(password, function(match) {
+        if (match) {
+          util.createSession(req, res, usernamefound);
+        } else {
+            JSAlert.alert('Wrong password!')
+            res.redirect('/login');
+          }
+        });
+      }
   });
 });
 
@@ -122,10 +113,20 @@ app.post('/signup', function(req, res) {
   var username = req.body.username;
   var password = req.body.password;
   
-  new User({ username: username, password: password }).save()
-    .then( (user) => {
-      res.redirect('/login');
-    });
+  new User({ username: username }).fetch().then(function(user) {
+    if (!user) {
+      var newUser = new User({
+        username: username,
+        password: password
+      });
+      newUser.save().then(function(newUser) {
+        util.createSession(req, res, newUser);
+      });
+    } else {
+      res.redirect('/signup');
+      JSAlert.alert('Account already exists! please choose a different username.');
+    }
+  })
 });
 
 
